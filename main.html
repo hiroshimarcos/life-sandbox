@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Sandbox</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <h2>🏠 Life Sandbox</h2>
+    
+    <div class="stats">
+        <strong>Nome:</strong> <span id="p-name"></span> | 
+        <strong>Energia:</strong> <span id="p-energy"></span>/100 | 
+        <strong>Fome:</strong> <span id="p-hunger"></span>/100 | 
+        <strong>Dinheiro:</strong> R$ <span id="p-money"></span><br>
+        <strong>Roupa:</strong> <span id="p-clothes" style="color: #17a2b8;"></span>
+    </div>
+
+    <div class="body-info">
+        <strong>💪 Porte Físico:</strong> <span id="p-body-type" style="color: #9b59b6; font-weight: bold;"></span> | 
+        <strong>Músculo:</strong> <span id="p-muscle"></span>/100 | 
+        <strong>Gordura:</strong> <span id="p-fat"></span>/100<br>
+        <small id="p-body-desc" style="color: #bdc3c7; font-style: italic;"></small>
+    </div>
+
+    <div id="job-info-panel" class="job-info"></div>
+
+    <div class="time-info">
+        <strong>Dia:</strong> <span id="t-day"></span> | 
+        <strong>Hora:</strong> <span id="t-hour"></span> |
+        <span style="color: #ffc107;"><strong>Próximo Aluguel (R$ 150):</strong> Dia <span id="t-rent-day">7</span></span>
+    </div>
+
+    <!-- MENU DE AMBIENTES PRINCIPAIS (Topo) -->
+<div id="environment-nav" class="nav-menu">
+        <button onclick="game.changeLocation('casa')">🏠 Casa</button>
+        <button onclick="game.changeLocation('academia')">🏋️ Academia (08h-20h)</button>
+        <button id="nav-trabalho" onclick="game.changeLocation('trabalho')">💼 Trabalho (09h-18h)</button>
+        <button onclick="game.changeLocation('mercado')">🛒 Mercado</button>
+    </div>
+    <!-- TÍTULO DO LOCAL ATUAL -->
+    <h3 id="room-title">🏠 Casa - Quarto</h3>
+
+    <!-- SUBMENU DE CÔMODOS (Aparece apenas quando estiver na Casa) -->
+    <div id="subroom-nav-container" class="subroom-menu"></div>
+
+    <h3 id="room-title">Ambiente</h3>
+    <div id="actions" class="actions-panel"></div>
+
+    <div id="log" class="log"></div>
+</div>
+
+<div id="minigame-modal" class="modal">
+    <div class="modal-content">
+        <h3 id="mg-title">Minijogo</h3>
+        <p id="mg-desc">Instruções...</p>
+        <div id="mg-area" class="minigame-area"></div>
+        <button id="mg-action-btn" style="background: #dc3545;" onclick="minigame.handleModalButtonClick()">Desistir da Ação</button>
+    </div>
+</div>
+
+<div id="wardrobe-modal" class="modal">
+    <div class="modal-content">
+        <h3>👔 Guarda-Roupa</h3>
+        <p>Escolha qual roupa deseja vestir agora:</p>
+        <div id="wardrobe-options-container" class="wardrobe-options"></div>
+        <button style="background: #6c757d; margin-top: 15px;" onclick="game.closeWardrobe()">Fechar</button>
+    </div>
+</div>
+
+<div id="gameover-modal" class="modal">
+    <div class="modal-content gameover-modal">
+        <h2 class="gameover-title">☠️ GAME OVER</h2>
+        <p id="gameover-reason" style="font-size: 16px; margin-bottom: 20px;">Você perdeu o jogo.</p>
+        <button style="background: #28a745; font-size: 18px;" onclick="location.reload()">🔄 Reiniciar Jogo</button>
+    </div>
+</div>
+
+<script type="text/javascript" src="scripts/player.js"></script>
+<script type="text/javascript" src="scripts/time.js"></script>
+<script type="text/javascript" src="scripts/market.js"></script>
+<script type="text/javascript" src="scripts/rooms.js"></script>
+<script type="text/javascript" src="scripts/minigames.js"></script>
+<script type="text/javascript" src="scripts/main.js"></script>
+
+</body>
+</html>
