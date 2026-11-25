@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Sandbox</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+<div id="start-screen" class="start-screen">
+    <div id="start-menu-step">
+        <h1>🏠 Life Sandbox</h1>
+        <p>Gerencie sua rotina, finanças, saúde e carreira.</p>
+        <div class="start-actions">
+            <button onclick="showCharacterCreation()">Novo Jogo</button>
+            <button class="btn-secondary" onclick="showImportStep()">Importar Jogo</button>
+        </div>
+    </div>
+
+    <div id="import-game-step" style="display: none;">
+        <h2>Importar Save</h2>
+        <div class="form-group">
+            <label for="import-code">Código do Save</label>
+            <textarea id="import-code" rows="4" placeholder="Cole o código do save aqui..."></textarea>
+        </div>
+        <div class="form-group">
+            <label for="import-file">Ou carregar arquivo (.txt)</label>
+            <input type="file" id="import-file" accept=".txt" onchange="handleImportFile(event)">
+        </div>
+        <p id="import-error" class="error-msg" style="display: none;"></p>
+        <div class="start-actions">
+            <button class="btn-secondary" onclick="backToStartMenu()">Voltar</button>
+            <button onclick="importSavedGame()">Carregar</button>
+        </div>
+    </div>
+
+    <div id="character-creation-step" style="display: none;">
+        <h2>Criar Personagem</h2>
+        <div class="form-group">
+            <label for="input-name">Nome</label>
+            <input type="text" id="input-name" placeholder="Digite seu nome" maxlength="30">
+            <p id="creation-error" class="error-msg" style="display: none;"></p>
+        </div>
+        <div class="form-group">
+            <label for="input-gender">Gênero</label>
+            <select id="input-gender">
+                <option value="masculino">Masculino</option>
+                <option value="feminino">Feminino</option>
+                <option value="outro">Outro / Não-binário</option>
+            </select>
+        </div>
+        <div class="start-actions">
+            <button class="btn-secondary" onclick="backToStartMenu()">Voltar</button>
+            <button onclick="startNewGame()">Começar</button>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="game-container" style="display: none;">
+    <div class="game-header">
+        <h2>🏠 Life Sandbox</h2>
+        <button id="settings-btn" onclick="openSettingsModal()" title="Configurações">⚙️</button>
+    </div>
+    
+    <div class="stats">
+        <strong>Nome:</strong> <span id="p-name"></span> | 
+        <strong>Gênero:</strong> <span id="p-gender"></span> | 
+        <strong>Energia:</strong> <span id="p-energy"></span>/100 | 
+        <strong>Fome:</strong> <span id="p-hunger"></span>/100 | 
+        <strong>Dinheiro:</strong> R$ <span id="p-money"></span><br>
+        <strong>Roupa:</strong> <span id="p-clothes" style="color: #17a2b8;"></span>
+    </div>
+
+    <div class="body-info">
+        <strong>💪 Porte Físico:</strong> <span id="p-body-type" style="color: #9b59b6; font-weight: bold;"></span> | 
+        <strong>Músculo:</strong> <span id="p-muscle"></span>/100 | 
+        <strong>Gordura:</strong> <span id="p-fat"></span>/100<br>
+        <small id="p-body-desc" style="color: #bdc3c7; font-style: italic;"></small>
+    </div>
+
+    <div id="job-info-panel" class="job-info"></div>
+
+    <div class="time-info">
+        <strong>Dia:</strong> <span id="t-day"></span> | 
+        <strong>Hora:</strong> <span id="t-hour"></span> |
+        <span style="color: #ffc107;"><strong>Próximo Aluguel (R$ <span id="t-rent-cost">150</span>):</strong> Dia <span id="t-rent-day">7</span></span>
+    </div>
+
+    <div id="pet-status-panel" class="pet-info" style="display: none;">
+        <div class="pet-header">
+            <strong>🐾 Pet:</strong> <span id="pet-name"></span>
+            <div class="pet-actions">
+                <button onclick="game.renamePet()">✏️ Renomear</button>
+                <button onclick="game.feedPet()">🍖 Alimentar</button>
+            </div>
+        </div>
+        <div class="pet-meta">
+            <strong>Ração:</strong> <span id="pet-food">0</span> |
+            <strong>Roupa:</strong> <span id="pet-outfit">Nenhuma</span> |
+            <strong>Acessório:</strong> <span id="pet-accessory">Nenhum</span>
+        </div>
+        <div class="pet-bars">
+            <label>⚡ Energia: <progress id="pet-energy-bar" max="100" value="100"></progress> <span id="pet-energy-val">100</span>/100</label>
+            <label>🍖 Fome: <progress id="pet-hunger-bar" max="100" value="0"></progress> <span id="pet-hunger-val">0</span>/100</label>
+            <label>🛁 Higiene: <progress id="pet-hygiene-bar" max="100" value="100"></progress> <span id="pet-hygiene-val">100</span>/100</label>
+            <label>😊 Felicidade: <progress id="pet-happiness-bar" max="100" value="100"></progress> <span id="pet-happiness-val">100</span>/100</label>
+        </div>
+    </div>
+
+    <!-- MENU DE AMBIENTES PRINCIPAIS (Topo) -->
+<div id="environment-nav" class="nav-menu">
+        <button onclick="game.changeLocation('casa')">🏠 Casa</button>
+        <button onclick="game.changeLocation('academia')">🏋️ Academia (08h-20h)</button>
+        <button id="nav-trabalho" onclick="game.changeLocation('trabalho')">💼 Trabalho (09h-18h)</button>
+        <button onclick="game.changeLocation('mercado')">🛒 Mercado</button>
+        <button onclick="game.changeLocation('imobiliaria')">🏗️ Imobiliária (09h-18h)</button>
+        <button onclick="game.changeLocation('petshop')">🐾 Pet Shop (09h-18h)</button>
+    </div>
+    <!-- TÍTULO DO LOCAL ATUAL -->
+    <h3 id="room-title">🏠 Casa - Quarto</h3>
+
+    <!-- SUBMENU DE CÔMODOS (Aparece apenas quando estiver na Casa) -->
+    <div id="subroom-nav-container" class="subroom-menu"></div>
+
+    <div id="actions" class="actions-panel"></div>
+
+    <div id="log" class="log"></div>
+</div>
+
+<div id="minigame-modal" class="modal">
+    <div class="modal-content">
+        <h3 id="mg-title">Minijogo</h3>
+        <p id="mg-desc">Instruções...</p>
+        <div id="mg-area" class="minigame-area"></div>
+        <button id="mg-action-btn" style="background: #dc3545;" onclick="minigame.handleModalButtonClick()">Desistir da Ação</button>
+    </div>
+</div>
+
+<div id="wardrobe-modal" class="modal">
+    <div class="modal-content">
+        <h3>👔 Guarda-Roupa</h3>
+        <p>Escolha qual roupa deseja vestir agora:</p>
+        <div id="wardrobe-options-container" class="wardrobe-options"></div>
+        <button style="background: #6c757d; margin-top: 15px;" onclick="game.closeWardrobe()">Fechar</button>
+    </div>
+</div>
+
+<div id="gameover-modal" class="modal">
+    <div class="modal-content gameover-modal">
+        <h2 class="gameover-title">☠️ GAME OVER</h2>
+        <p id="gameover-reason" style="font-size: 16px; margin-bottom: 20px;">Você perdeu o jogo.</p>
+        <button style="background: #28a745; font-size: 18px;" onclick="location.reload()">🔄 Reiniciar Jogo</button>
+    </div>
+</div>
+
+<div id="settings-modal" class="modal">
+    <div class="modal-content">
+        <h3>⚙️ Configurações</h3>
+        <p>Exportar Save:</p>
+        <textarea id="export-code" readonly rows="4"></textarea>
+        <div class="modal-actions">
+            <button onclick="copySaveCode()">Copiar Código</button>
+            <button onclick="downloadSaveFile()">Baixar .txt</button>
+            <button id="btn-exit-to-menu" class="btn-danger" onclick="exitToStartScreen()">Voltar para Tela Inicial</button>
+            <button class="btn-secondary" onclick="closeSettingsModal()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="scripts/player.js"></script>
+<script type="text/javascript" src="scripts/time.js"></script>
+<script type="text/javascript" src="scripts/market.js"></script>
+<script type="text/javascript" src="scripts/rooms.js"></script>
+<script type="text/javascript" src="scripts/minigames.js"></script>
+<script type="text/javascript" src="scripts/save.js"></script>
+<script type="text/javascript" src="scripts/main.js"></script>
+
+</body>
+</html>

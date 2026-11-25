@@ -158,15 +158,15 @@ describe('Market System', () => {
 });
 
 describe('HTML Integrity', () => {
-    test('sem IDs duplicados no main.html', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+    test('sem IDs duplicados no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = [...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]);
         const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
         assert.deepEqual(duplicates, []);
     });
 
     test('presença dos IDs do menu inicial e criação de personagem', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
         const requiredIds = [
             'start-screen',
@@ -180,12 +180,12 @@ describe('HTML Integrity', () => {
         ];
 
         requiredIds.forEach(id => {
-            assert.equal(ids.has(id), true, `ID ausente no main.html: ${id}`);
+            assert.equal(ids.has(id), true, `ID ausente no index.html: ${id}`);
         });
     });
 
     test('presença dos IDs de exportar e importar save', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
         const saveIds = [
             'settings-btn',
@@ -198,34 +198,34 @@ describe('HTML Integrity', () => {
         ];
 
         saveIds.forEach(id => {
-            assert.equal(ids.has(id), true, `ID ausente no main.html: ${id}`);
+            assert.equal(ids.has(id), true, `ID ausente no index.html: ${id}`);
         });
     });
 
-    test('presença do botão btn-exit-to-menu no main.html', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+    test('presença do botão btn-exit-to-menu no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
-        assert.equal(ids.has('btn-exit-to-menu'), true, 'ID ausente no main.html: btn-exit-to-menu');
+        assert.equal(ids.has('btn-exit-to-menu'), true, 'ID ausente no index.html: btn-exit-to-menu');
     });
 
-    test('presença do botão da imobiliária no main.html', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+    test('presença do botão da imobiliária no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         assert.match(html, /onclick="game\.changeLocation\('imobiliaria'\)"/);
     });
 
-    test('presença do botão do Pet Shop no main.html', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+    test('presença do botão do Pet Shop no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         assert.match(html, /onclick="game\.changeLocation\('petshop'\)"/);
     });
 
-    test('presença do ID t-rent-cost no main.html', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+    test('presença do ID t-rent-cost no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
-        assert.equal(ids.has('t-rent-cost'), true, 'ID ausente no main.html: t-rent-cost');
+        assert.equal(ids.has('t-rent-cost'), true, 'ID ausente no index.html: t-rent-cost');
     });
 
-    test('presença dos IDs do painel de status do pet no main.html', () => {
-        const html = fs.readFileSync(path.resolve('main.html'), 'utf8');
+    test('presença dos IDs do painel de status do pet no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
         const petIds = [
             'pet-status-panel',
@@ -237,7 +237,7 @@ describe('HTML Integrity', () => {
         ];
 
         petIds.forEach(id => {
-            assert.equal(ids.has(id), true, `ID ausente no main.html: ${id}`);
+            assert.equal(ids.has(id), true, `ID ausente no index.html: ${id}`);
         });
     });
 });
