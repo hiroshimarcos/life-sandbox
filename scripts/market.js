@@ -18,108 +18,93 @@ class MarketManager {
 
     // Retorna apenas as roupas que ainda NÃO foram compradas usando a lista global 'wardrobeOptions'
     getClothingActions(game) {
-        let actions = [];
-        
-        // Filtra direto da lista global as roupas não compradas
         const unownedClothes = wardrobeOptions.filter(item => !item.owned);
 
-        unownedClothes.queries || unownedClothes.forEach(item => {
-            actions.push({
-                label: `Comprar ${item.name} (R$ ${item.price})`,
-                costEnergy: -10,
-                costHours: 0.5,
-                execute: (g) => {
-                    if (g.player.money >= item.price) {
-                        g.player.money -= item.price;
-                        g.player.buyOutfit(item.id); // Altera o status 'owned' na lista global
-                        game.player.modifyEnergy(-10); // Perde energia
-                        game.time.advanceTime(0.5, game); // Avança hora
-                        g.log(`🛍️ Você comprou: **${item.name}**!`);
-                    } else {
-                        g.log(`Você não tem dinheiro suficiente para ${item.name} (R$ ${item.price})!`);
-                    }
-                    g.updateUI();
-                    g.renderActions();
-                }
-            });
-        });
-
-        if (actions.length === 0) {
-            actions.push({
+        if (unownedClothes.length === 0) {
+            return [{
                 label: "✨ Todas as roupas já foram adquiridas!",
                 costEnergy: 0,
                 costHours: 0,
                 execute: (g) => { g.log("A arara de roupas está vazia."); }
-            });
+            }];
         }
-        return actions;
+
+        return unownedClothes.map(item => ({
+            label: `Comprar ${item.name} (R$ ${item.price})`,
+            costEnergy: -10,
+            costHours: 0.5,
+            execute: (g) => {
+                if (g.player.money < item.price) {
+                    g.log(`Você não tem dinheiro suficiente para ${item.name} (R$ ${item.price})!`);
+                    return;
+                }
+                g.player.money -= item.price;
+                g.player.buyOutfit(item.id);
+                g.player.modifyEnergy(-10);
+                g.time.advanceTime(0.5, g);
+                g.log(`🛍️ Você comprou: **${item.name}**!`);
+                g.updateUI();
+                g.renderActions();
+            }
+        }));
     }
 
-    getFoodActions(game) {
-        let actions = [];
-        this.catalog.comida.forEach(item => {
+    getFoodActions() {
+        return this.catalog.comida.map(item => {
             const energySign = item.energyRestore >= 0 ? "+" : "";
             const fatSign = item.fatFood >= 0 ? "+" : "";
-            actions.push({
+            return {
                 label: `Comprar ${item.name} [Estoque: ${item.stock}] ⚡ ${energySign}${item.energyRestore} 🤤 ${fatSign}${item.fatFood} (R$ ${item.price})`,
                 costEnergy: -1,
                 costHours: 0.25,
                 execute: (g) => {
-                    if (g.player.money >= item.price) {
-                        g.player.money -= item.price;
-                        item.stock += 1;
-                        game.player.modifyEnergy(-1); // Perde energia
-                        game.time.advanceTime(0.25, game); // Avança hora
-                        g.log(`🛒 Você comprou 1x ${item.name} para o seu estoque!`);
-                    } else {
+                    if (g.player.money < item.price) {
                         g.log(`Você não tem dinheiro suficiente para comprar ${item.name} (R$ ${item.price})!`);
+                        return;
                     }
+                    g.player.money -= item.price;
+                    item.stock += 1;
+                    g.player.modifyEnergy(-1);
+                    g.time.advanceTime(0.25, g);
+                    g.log(`🛒 Você comprou 1x ${item.name} para o seu estoque!`);
                     g.updateUI();
                     g.renderActions();
                 }
-            });
+            };
         });
-        return actions;
     }
 
-    // Retorna as ações de comer os itens que estão no estoque (para usar na Cozinha)
-    getKitchenFoodActions(game) {
-        let actions = [];
-        
-        this.catalog.comida.forEach(item => {
-            if (item.stock > 0) {
-                // Formata os sinais de + ou - para energia e gordura
-                const energySign = item.energyRestore >= 0 ? "+" : "";
-                const fatSign = item.fatFood >= 0 ? "+" : "";
+    getKitchenFoodActions() {
+        const availableFood = this.catalog.comida.filter(item => item.stock > 0);
 
-                actions.push({
-                    label: `Comer ${item.name} [Estoque: ${item.stock}] ⚡ ${energySign}${item.energyRestore} 🤤 ${fatSign}${item.fatFood}`,
-                    costEnergy: 0,
-                    costHours: 0.25, // 15 minutos para comer
-                    execute: (g) => {
-                        item.stock -= 1;
-                        g.player.modifyHunger(-item.hungerRestore);
-                        g.player.modifyEnergy(item.energyRestore); // Valores positivos recuperam energia
-                        g.player.modifyFat(item.fatFood);    
-                        game.time.advanceTime(0.25, game); // Avança hora
-                        g.log(`😋 Você comeu 1x ${item.name} do seu estoque.`);
-                        g.updateUI();
-                        g.renderActions();
-                    }
-                });
-            }
-        });
-
-        if (actions.length === 0) {
-            actions.push({
+        if (availableFood.length === 0) {
+            return [{
                 label: "🚫 Seu estoque de comida está vazio (Vá ao Mercado comprar)",
                 costEnergy: 0,
                 costHours: 0,
                 execute: (g) => { g.log("Você não tem comida guardada na despensa."); }
-            });
+            }];
         }
 
-        return actions;
+        return availableFood.map(item => {
+            const energySign = item.energyRestore >= 0 ? "+" : "";
+            const fatSign = item.fatFood >= 0 ? "+" : "";
+            return {
+                label: `Comer ${item.name} [Estoque: ${item.stock}] ⚡ ${energySign}${item.energyRestore} 🤤 ${fatSign}${item.fatFood}`,
+                costEnergy: 0,
+                costHours: 0.25,
+                execute: (g) => {
+                    item.stock -= 1;
+                    g.player.modifyHunger(-item.hungerRestore);
+                    g.player.modifyEnergy(item.energyRestore);
+                    g.player.modifyFat(item.fatFood);
+                    g.time.advanceTime(0.25, g);
+                    g.log(`😋 Você comeu 1x ${item.name} do seu estoque.`);
+                    g.updateUI();
+                    g.renderActions();
+                }
+            };
+        });
     }
 }
 

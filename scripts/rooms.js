@@ -1,6 +1,73 @@
 // ==========================================
 // AMBIENTES E SUBROOMS (CÔMODOS)
 // ==========================================
+function buyHouseUpgrade(game, upgradeId, label, price) {
+    if (game.player.hasHouseUpgrade(upgradeId)) return;
+    if (game.player.money < price) {
+        game.log(`❌ Dinheiro insuficiente! Você precisa de R$ ${price} para construir ${label}.`);
+        return;
+    }
+    game.player.money -= price;
+    game.player.unlockHouseUpgrade(upgradeId);
+    game.time.updateRentCost(game.player);
+    game.player.modifyEnergy(-5);
+    game.time.advanceTime(1, game);
+    game.log(`🏗️ Você contratou a reforma e construiu **${label}** em casa! O aluguel subiu para R$ ${game.time.rentCost}.`);
+    game.updateUI();
+    game.renderActions();
+}
+
+function adoptPetFromShop(game, type, price, defaultName) {
+    if (game.player.pet) {
+        game.log("🚫 Você já possui um pet!");
+        return;
+    }
+    if (game.player.money < price) {
+        game.log(`❌ Dinheiro insuficiente! Você precisa de R$ ${price} para adotar um ${type}.`);
+        return;
+    }
+    const input = typeof prompt === "function" ? prompt(`Escolha um nome para o seu ${type}:`, defaultName) : "";
+    const name = (input && input.trim()) ? input.trim() : defaultName;
+    game.player.money -= price;
+    game.player.adoptPet(type, name);
+    game.log(`🐾 Você adotou um ${type} chamado **${name}**! O menu de Status do Pet foi desbloqueado.`);
+}
+
+function buyPetItem(game, price, logMessage, applyEffect) {
+    if (!game.player.pet) {
+        game.log("🚫 Você precisa adotar um pet antes de comprar itens na loja!");
+        return;
+    }
+    if (game.player.money < price) {
+        game.log(`❌ Dinheiro insuficiente! Você precisa de R$ ${price}.`);
+        return;
+    }
+    game.player.money -= price;
+    applyEffect(game.player.pet);
+    game.log(logMessage);
+}
+
+function interactWithPet(game, { playerEnergy, petEnergy, hours, happiness, actionName }) {
+    if (!game.player.pet) {
+        game.log("🚫 Você precisa adotar um pet antes!");
+        return;
+    }
+    if (game.player.energy < playerEnergy) {
+        game.log("❌ Energia insuficiente para interagir com seu pet.");
+        return;
+    }
+    if (game.player.pet.energy < petEnergy) {
+        game.log(`😴 **${game.player.pet.name}** está sem energia para ${actionName}.`);
+        return;
+    }
+    game.player.modifyEnergy(-playerEnergy);
+    game.time.advanceTime(hours, game);
+    game.player.modifyPetStat("energy", -petEnergy);
+    game.player.modifyPetStat("happiness", happiness);
+    game.log(`🐾 Você ${actionName} com **${game.player.pet.name}**! (+${happiness} Felicidade, -${petEnergy} Energia do Pet)`);
+    game.updateUI();
+}
+
 const rooms = {
     // 🏠 AMBIENTE 1: A CASA
     casa: {
@@ -28,6 +95,20 @@ const rooms = {
                         execute: (game) => {
                             game.searchForJob();
                         }
+                    },
+                    {
+                        label: "🐾 Fazer Carinho no Pet",
+                        requiresPet: true,
+                        costEnergy: -5,
+                        petEnergyCost: 5,
+                        costHours: 0.5,
+                        execute: (game) => interactWithPet(game, {
+                            playerEnergy: 5,
+                            petEnergy: 5,
+                            hours: 0.5,
+                            happiness: 15,
+                            actionName: "fez carinho"
+                        })
                     }
                 ]
             },
@@ -108,6 +189,7 @@ const rooms = {
             },
             patio: {
                 name: "Pátio",
+                requiresUpgrade: "patio",
                 actions: [
                     {
                         label: "🌱 Cuidar do Jardim",
@@ -117,6 +199,39 @@ const rooms = {
                             game.player.modifyEnergy(-15);
                             game.time.advanceTime(1, game);
                             game.log("🌿 Você cuidou das plantas do pátio.");
+                            game.updateUI();
+                        }
+                    },
+                    {
+                        label: "🎾 Brincar com o Pet",
+                        requiresPet: true,
+                        costEnergy: -15,
+                        petEnergyCost: 15,
+                        costHours: 1,
+                        execute: (game) => interactWithPet(game, {
+                            playerEnergy: 15,
+                            petEnergy: 15,
+                            hours: 1,
+                            happiness: 25,
+                            actionName: "brincou"
+                        })
+                    }
+                ]
+            },
+            piscina: {
+                name: "Piscina",
+                requiresUpgrade: "piscina",
+                actions: [
+                    {
+                        label: "🏊 Nadar na Piscina",
+                        costEnergy: -20,
+                        costHours: 1,
+                        execute: (game) => {
+                            game.player.modifyEnergy(-20);
+                            game.player.modifyMuscle(2);
+                            game.player.modifyFat(-2);
+                            game.time.advanceTime(1, game);
+                            game.log("🏊 Você nadou na piscina e se exercitou! (+2 Músculo, -2 Gordura)");
                             game.updateUI();
                         }
                     }
@@ -253,6 +368,7 @@ const rooms = {
                         costEnergy: -30, // perde energia
                         costHours: 2,
                         isWorkTask: true,
+                        requiresPendingTasks: true,
                         execute: (game) => {
                             if (game.player.taskQueue > 0) {
                                 minigame.openWorkGame((success, cancelled) => {
@@ -362,6 +478,145 @@ const rooms = {
             comida: {
                 name: "Mercearia (Comida)",
                 actions: []
+            }
+        }
+    },
+
+    imobiliaria: {
+        name: "🏗️ Imobiliária & Construtora",
+        isEnvironment: true,
+        subRooms: {
+            reformas: {
+                name: "Reformas e Melhorias",
+                actions: [
+                    {
+                        label: "🌿 Construir Pátio com Jardim (R$ 200 | +R$ 50 aluguel)",
+                        upgradeId: "patio",
+                        price: 200,
+                        costEnergy: -5,
+                        costHours: 1,
+                        execute: (game) => buyHouseUpgrade(game, "patio", "Pátio com Jardim", 200)
+                    },
+                    {
+                        label: "🏊 Construir Área da Piscina (R$ 1000 | +R$ 100 aluguel)",
+                        upgradeId: "piscina",
+                        price: 1000,
+                        costEnergy: -5,
+                        costHours: 1,
+                        execute: (game) => buyHouseUpgrade(game, "piscina", "Área da Piscina", 1000)
+                    }
+                ]
+            }
+        }
+    },
+
+    petshop: {
+        name: "🐾 Pet Shop",
+        isEnvironment: true,
+        subRooms: {
+            balcao: {
+                name: "Balcão",
+                actions: [
+                    {
+                        label: "🐶 Brincar com os Filhotinhos",
+                        costEnergy: -10,
+                        costHours: 1,
+                        execute: (game) => {
+                            if (game.player.energy < 10) {
+                                game.log("🚫 Energia insuficiente para brincar com os filhotinhos.");
+                                return;
+                            }
+                            game.player.modifyEnergy(-10);
+                            game.time.advanceTime(1, game);
+                            if (game.player.pet) {
+                                game.player.modifyPetStat("happiness", 10);
+                                game.log(`🐾 Você brincou com os filhotinhos e ${game.player.pet.name} adorou! (-10 Energia, +10 Felicidade do Pet)`);
+                            } else {
+                                game.log("🐾 Você brincou com os filhotinhos no Pet Shop! (-10 Energia)");
+                            }
+                        }
+                    }
+                ]
+            },
+            vitrine: {
+                name: "Vitrine",
+                actions: [
+                    {
+                        label: "🐶 Adotar Cachorro (R$ 300)",
+                        costEnergy: 0,
+                        costHours: 0,
+                        execute: (game) => adoptPetFromShop(game, "Cachorro", 300, "Rex")
+                    },
+                    {
+                        label: "🐱 Adotar Gato (R$ 250)",
+                        costEnergy: 0,
+                        costHours: 0,
+                        execute: (game) => adoptPetFromShop(game, "Gato", 250, "Mimi")
+                    }
+                ]
+            },
+            loja: {
+                name: "Loja",
+                actions: [
+                    {
+                        label: "🦴 Comprar Ração para Pet (R$ 25)",
+                        costEnergy: 0,
+                        costHours: 0,
+                        execute: (game) => buyPetItem(
+                            game,
+                            25,
+                            "🦴 Você comprou 1x Ração para Pet!",
+                            (pet) => { pet.foodStock += 1; }
+                        )
+                    },
+                    {
+                        label: "🧥 Comprar Colete Pet (R$ 60)",
+                        costEnergy: 0,
+                        costHours: 0,
+                        execute: (game) => buyPetItem(
+                            game,
+                            60,
+                            "🧥 Você comprou e equipou o **Colete Pet**!",
+                            (pet) => { pet.outfit = "Colete Pet"; }
+                        )
+                    },
+                    {
+                        label: "🎀 Comprar Coleira Estilosa (R$ 40)",
+                        costEnergy: 0,
+                        costHours: 0,
+                        execute: (game) => buyPetItem(
+                            game,
+                            40,
+                            "🎀 Você comprou e equipou a **Coleira Estilosa**!",
+                            (pet) => { pet.accessory = "Coleira Estilosa"; }
+                        )
+                    }
+                ]
+            },
+            banho_tosa: {
+                name: "Banho e Tosa",
+                actions: [
+                    {
+                        label: "🛁 Dar Banho no Pet (R$ 40)",
+                        costEnergy: 0,
+                        costHours: 1,
+                        execute: (game) => {
+                            if (!game.player.pet) {
+                                game.log("🚫 Você precisa ter um pet para usar o Banho e Tosa!");
+                                return;
+                            }
+                            if (game.player.money < 40) {
+                                game.log("❌ Dinheiro insuficiente! O banho custa R$ 40.");
+                                return;
+                            }
+                            game.player.money -= 40;
+                            game.time.advanceTime(1, game);
+                            game.player.modifyPetStat("hygiene", 60);
+                            game.player.modifyPetStat("happiness", 10);
+                            game.log(`🛁 **${game.player.pet.name}** tomou um banho cheiroso! (+60 Higiene, +10 Felicidade)`);
+                        }
+                    }
+                ]
             }
         }
     }

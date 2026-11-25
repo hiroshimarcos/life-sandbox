@@ -1,9 +1,26 @@
+const GENDER_LABELS = {
+    masculino: "Masculino",
+    feminino: "Feminino",
+    outro: "Outro / Não-binário"
+};
+
+const ENV_TITLES = {
+    casa: "🏠 Casa",
+    academia: "🏋️ Academia",
+    trabalho: "💼 Trabalho",
+    mercado: "🛒 Mercado",
+    imobiliaria: "🏗️ Imobiliária",
+    petshop: "🐾 Pet Shop"
+};
+
+const INDECENT_OUTFITS = ["pijama", "praia", "fantasia"];
+
 // ==========================================
 // MOTOR DO JOGO (GERENCIADOR)
 // ==========================================
 class GameEngine {
-    constructor() {
-        this.player = new Player("Alex");
+    constructor(playerName = "Alex", playerGender = "masculino", savedData = null) {
+        this.player = new Player(playerName, playerGender);
         this.time = new TimeSystem();
         
         // Controle de localização atualizada
@@ -13,14 +30,101 @@ class GameEngine {
         
         this.isGameOver = false;
 
-        this.initUI();
+        if (savedData) {
+            this.restoreState(savedData);
+        } else {
+            this.initUI();
+        }
+    }
+
+    static fromSave(data) {
+        return new GameEngine(data.player.name, data.player.gender, data);
+    }
+
+    restoreState(data) {
+        const toNum = (val, fallback) => (val === null || val === "" || typeof val === "boolean" || !Number.isFinite(Number(val)))
+            ? fallback
+            : Number(val);
+
+        Object.assign(this.player, {
+            name: data.player.name,
+            gender: data.player.gender || "masculino",
+            energy: toNum(data.player.energy, this.player.energy),
+            maxEnergy: toNum(data.player.maxEnergy, this.player.maxEnergy),
+            hunger: toNum(data.player.hunger, this.player.hunger),
+            money: toNum(data.player.money, this.player.money),
+            fat: toNum(data.player.fat, this.player.fat),
+            muscle: toNum(data.player.muscle, this.player.muscle),
+            isEmployed: Boolean(data.player.isEmployed),
+            taskQueue: toNum(data.player.taskQueue, 0),
+            houseUpgrades: { patio: false, piscina: false, ...(data.player.houseUpgrades || {}) },
+            pet: data.player.pet && typeof data.player.pet === "object"
+                ? {
+                    type: data.player.pet.type || "Cachorro",
+                    name: data.player.pet.name || "Rex",
+                    energy: toNum(data.player.pet.energy, 100),
+                    hunger: toNum(data.player.pet.hunger, 0),
+                    hygiene: toNum(data.player.pet.hygiene, 100),
+                    happiness: toNum(data.player.pet.happiness, 100),
+                    foodStock: toNum(data.player.pet.foodStock, 0),
+                    outfit: data.player.pet.outfit || "Nenhuma",
+                    accessory: data.player.pet.accessory || "Nenhum"
+                }
+                : null
+        });
+        this.player.setClothes(data.player.clothes || "pijama");
+
+        const timeData = data.time || {};
+        Object.assign(this.time, {
+            day: toNum(timeData.day, this.time.day) || 1,
+            hour: toNum(timeData.hour, this.time.hour),
+            minute: toNum(timeData.minute, this.time.minute)
+        });
+        this.time.updateRentCost(this.player);
+
+        const ownedSet = new Set(Array.isArray(data.ownedOutfits) ? data.ownedOutfits : ["pijama", "casual"]);
+        wardrobeOptions.forEach(outfit => {
+            outfit.owned = ownedSet.has(outfit.id);
+        });
+
+        const foodStock = data.foodStock || {};
+        market.catalog.comida.forEach(item => {
+            item.stock = Number(foodStock[item.id]) || 0;
+        });
+
+        const loc = data.location || {};
+        const env = rooms[loc.currentEnvironment] ? loc.currentEnvironment : "casa";
+        const envData = rooms[env];
+        let sub = loc.currentSubRoom;
+
+        if (envData.isEnvironment) {
+            if (!sub || !envData.subRooms[sub]) {
+                sub = Object.keys(envData.subRooms)[0];
+            }
+            const envPrefix = ENV_TITLES[env] || env;
+            document.getElementById("room-title").innerText = `${envPrefix} - ${envData.subRooms[sub].name}`;
+        }
+
+        this.currentEnvironment = env;
+        this.currentSubRoom = sub;
+        this.isFirstLoad = false;
+        this.isGameOver = false;
+
+        document.getElementById("log").innerHTML = "";
+        this.updateUI();
+        this.renderActions();
+        this.renderSubRoomsNavigation();
+        this.log("💾 Jogo importado com sucesso!");
     }
 
     initUI() {
         this.updateUI();
         this.changeLocation("casa", "quarto");
         this.isFirstLoad = false; // A partir daqui, entrar na casa vai direto pra sala
-        this.log("Bem-vindo! Lembre-se de juntar R$ 150 para o aluguel a cada 7 dias!");
+        const greeting = this.player.gender === "feminino"
+            ? "Bem-vinda"
+            : (this.player.gender === "masculino" ? "Bem-vindo" : "Bem-vindo(a)");
+        this.log(`${greeting}, ${this.player.name}! Lembre-se de juntar R$ ${this.time.rentCost} para o aluguel a cada 7 dias!`);
     }
 
     // Função unificada para mudar de lugar com log de origem e destino
@@ -34,23 +138,37 @@ class GameEngine {
                 return;
             }
             // Verifica se está usando a roupa esportiva (id: "esporte")
-            if (!this.player.hasOutfit("esporte") || this.player.clothes !== "Roupa Esportiva 🏃") {
+            if (!this.player.hasOutfit("esporte") || this.player.clothes !== "esporte") {
                 this.log("🚫 **ENTRADA PROIBIDA!** Você precisa estar vestindo a Roupa Esportiva 🏃 para entrar na academia.");
                 return;
             }
         }
 
-        // Validações de vestuário para a Mercado
         if (envKey === "mercado") {
-
-            const notAllowedMarketOutfits = [
-                "Pijama 🛌",
-                "Roupa de Praia 🌴",
-                "Fantasia de Super-herói 🦸",
-            ];
-            // Verifica se está usando alguma roupa adequada
-            if (notAllowedMarketOutfits.includes(this.player.clothes)) {
+            if (INDECENT_OUTFITS.includes(this.player.clothes)) {
                 this.log("🚫 **ENTRADA PROIBIDA!** Você precisa estar vestindo uma roupa adequada para entrar no mercado.");
+                return;
+            }
+        }
+
+        if (envKey === "imobiliaria") {
+            if (this.time.hour < 9 || this.time.hour >= 18) {
+                this.log("🏗️ **IMOBILIÁRIA FECHADA!** O horário de funcionamento é das 09:00 às 18:00.");
+                return;
+            }
+            if (INDECENT_OUTFITS.includes(this.player.clothes)) {
+                this.log("🚫 **ENTRADA PROIBIDA!** Você precisa estar vestindo uma roupa decente para entrar na imobiliária.");
+                return;
+            }
+        }
+
+        if (envKey === "petshop") {
+            if (this.time.hour < 9 || this.time.hour >= 18) {
+                this.log("🐾 **PET SHOP FECHADO!** O horário de funcionamento é das 09:00 às 18:00.");
+                return;
+            }
+            if (INDECENT_OUTFITS.includes(this.player.clothes)) {
+                this.log("🚫 **ENTRADA PROIBIDA!** Você precisa estar vestindo uma roupa adequada para entrar no Pet Shop.");
                 return;
             }
         }
@@ -62,13 +180,7 @@ class GameEngine {
                 return;
             }
             
-            // Roupas permitidas no trabalho: casual, terno, trabalho_pesado
-            // Verificamos com base no nome exibido atual ou no ID armazenado no player
-            const allowedWorkOutfits = [
-                "Camiseta e Jeans 👕", 
-                "Terno Completo 💼", 
-                "Macacão de Trabalho 🛠️"
-            ];
+            const allowedWorkOutfits = ["casual", "terno", "trabalho_pesado"];
 
             if (!allowedWorkOutfits.includes(this.player.clothes)) {
                 this.log("👔 **DRESS CODE RECUSADO!** Você não pode trabalhar vestindo isso. Use roupas casuais, terno ou macacão de trabalho.");
@@ -77,27 +189,27 @@ class GameEngine {
         }
 
         if (rooms[envKey]) {
+            let targetSubRoom = subRoomKey;
+            if (rooms[envKey].isEnvironment) {
+                if (!targetSubRoom || !rooms[envKey].subRooms[targetSubRoom]) {
+                    targetSubRoom = envKey === "casa" ? "sala" : Object.keys(rooms[envKey].subRooms)[0];
+                }
+                const subRoom = rooms[envKey].subRooms[targetSubRoom];
+                if (subRoom.requiresUpgrade && !this.player.hasHouseUpgrade(subRoom.requiresUpgrade)) {
+                    this.log("🔒 **CÔMODO BLOQUEADO!** Compre esta melhoria na Imobiliária.");
+                    return;
+                }
+            }
+
             // Descobre o nome do local de origem para o log
             const originName = this.getCurrentLocationName();
 
             this.currentEnvironment = envKey;
 
             if (rooms[envKey].isEnvironment) {
-                // Se um subcômodo foi passado explicitamente, usa ele.
-                if (subRoomKey && rooms[envKey].subRooms[subRoomKey]) {
-                    this.currentSubRoom = subRoomKey;
-                } else {
-                    // Se for a Casa, define explicitamente a sala como padrão. Nos outros, pega o primeiro.
-                    if (envKey === "casa") {
-                        this.currentSubRoom = "sala";
-                    } else {
-                        const keys = Object.keys(rooms[envKey].subRooms);
-                        this.currentSubRoom = keys[0]; 
-                    }
-                }
-
+                this.currentSubRoom = targetSubRoom;
                 const roomName = rooms[envKey].subRooms[this.currentSubRoom].name;
-                const envPrefix = envKey === "casa" ? "🏠 Casa" : (envKey === "academia" ? "🏋️ Academia" : (envKey === "trabalho" ? "💼 Trabalho" : "🛒 Mercado"));
+                const envPrefix = ENV_TITLES[envKey] || envKey;
                 document.getElementById("room-title").innerText = `${envPrefix} - ${roomName}`;
             }
 
@@ -115,12 +227,12 @@ class GameEngine {
 
     // Auxiliar para pegar o nome legível do local atual
     getCurrentLocationName() {
-        if (rooms[this.currentEnvironment].isEnvironment) {
-            const subName = rooms[this.currentEnvironment].subRooms[this.currentSubRoom].name;
-            return `Casa (${subName})`;
-        } else {
-            return rooms[this.currentEnvironment].name;
+        const env = rooms[this.currentEnvironment];
+        if (env.isEnvironment) {
+            const subName = env.subRooms[this.currentSubRoom].name;
+            return `${env.name} (${subName})`;
         }
+        return env.name;
     }
 
     // Atalho de compatibilidade
@@ -153,21 +265,29 @@ class GameEngine {
             const subRooms = currentEnv.subRooms;
 
             Object.keys(subRooms).forEach(subKey => {
+                const subRoom = subRooms[subKey];
+                const isLocked = Boolean(subRoom.requiresUpgrade && !this.player.hasHouseUpgrade(subRoom.requiresUpgrade));
                 const btn = document.createElement("button");
                 btn.className = "subroom-btn";
-                btn.innerText = subRooms[subKey].name; // Nome do cômodo (ex: Quarto, Banheiro, Pátio, Escritório)
-                
+                btn.innerText = isLocked ? `🔒 ${subRoom.name}` : subRoom.name;
+
                 btn.style.padding = "8px 14px";
                 btn.style.cursor = "pointer";
                 btn.style.borderRadius = "4px";
                 btn.style.border = "1px solid #444";
 
-                if (this.currentSubRoom === subKey) {
+                if (isLocked) {
+                    btn.style.background = "#2c3e50";
+                    btn.style.color = "#ecf0f1";
+                    btn.style.opacity = "0.5";
+                    btn.style.cursor = "not-allowed";
+                    btn.disabled = true;
+                } else if (this.currentSubRoom === subKey) {
                     btn.style.background = "#27ae60"; // Destaque para o cômodo atual
                     btn.style.color = "#fff";
                     btn.disabled = true;
                 } else {
-                    btn.style.background = "#2c3e50"; 
+                    btn.style.background = "#2c3e50";
                     btn.style.color = "#ecf0f1";
                 }
 
@@ -194,13 +314,13 @@ class GameEngine {
             btn.className = "wardrobe-btn";
             btn.innerText = outfit.name;
             
-            if (this.player.clothes === outfit.name) {
+            if (this.player.clothes === outfit.id) {
                 btn.innerText += " (Em uso)";
                 btn.style.borderColor = "#27ae60";
             }
 
             btn.onclick = () => {
-                this.player.setClothes(outfit.name);
+                this.player.setClothes(outfit.id);
                 this.log(`👕 Você trocou de roupa e agora está vestindo **${outfit.name}**.`);
                 this.updateUI();
                 this.closeWardrobe();
@@ -283,18 +403,26 @@ class GameEngine {
         }
 
         currentActions.forEach(action => {
+            if (action.requiresPet && !this.player.pet) return;
+
             const btn = document.createElement("button");
             btn.innerText = `${action.label}` + (action.costHours > 0 ? ` ⏱️ (${action.costHours}h)` : "");
 
             let cannotExecute = false;
             let disabledReason = "";
 
-            if (action.costEnergy < 0 && this.player.energy < Math.abs(action.costEnergy)) {
+            if (action.upgradeId && this.player.hasHouseUpgrade(action.upgradeId)) {
+                cannotExecute = true;
+                disabledReason = " - [Já Construído]";
+            } else if (action.costEnergy < 0 && this.player.energy < Math.abs(action.costEnergy)) {
                 cannotExecute = true;
                 disabledReason = " - [Sem Energia]";
+            } else if (action.petEnergyCost && this.player.pet && this.player.pet.energy < action.petEnergyCost) {
+                cannotExecute = true;
+                disabledReason = " - [Pet Sem Energia]";
             }
 
-            if (this.currentEnvironment === "trabalho" && action.label.includes("Executar Tarefa") && this.player.taskQueue <= 0) {
+            if (this.currentEnvironment === "trabalho" && action.requiresPendingTasks && this.player.taskQueue <= 0) {
                 cannotExecute = true;
                 disabledReason = " - [Sem Tarefas]";
             }
@@ -330,10 +458,11 @@ class GameEngine {
 
     updateUI() {
         document.getElementById("p-name").innerText = this.player.name;
+        document.getElementById("p-gender").innerText = GENDER_LABELS[this.player.gender] || this.player.gender;
         document.getElementById("p-energy").innerText = this.player.energy;
         document.getElementById("p-hunger").innerText = this.player.hunger;
         document.getElementById("p-money").innerText = this.player.money;
-        document.getElementById("p-clothes").innerText = this.player.clothes;
+        document.getElementById("p-clothes").innerText = this.player.getClothesName();
 
         const bodyInfo = this.player.getBodyTypeInfo();
         document.getElementById("p-body-type").innerText = bodyInfo.display_name;
@@ -354,14 +483,206 @@ class GameEngine {
         document.getElementById("t-day").innerText = this.time.day;
         document.getElementById("t-hour").innerText = `${String(this.time.hour).padStart(2, '0')}:${String(this.time.minute).padStart(2, '0')}`;
         document.getElementById("t-rent-day").innerText = this.time.getNextRentDay();
+        document.getElementById("t-rent-cost").innerText = this.time.rentCost;
+
+        const petPanel = document.getElementById("pet-status-panel");
+        if (petPanel) {
+            if (!this.player.pet) {
+                petPanel.style.display = "none";
+            } else {
+                const pet = this.player.pet;
+                petPanel.style.display = "block";
+                document.getElementById("pet-name").innerText = `${pet.type} - ${pet.name}`;
+                document.getElementById("pet-food").innerText = pet.foodStock;
+                document.getElementById("pet-outfit").innerText = pet.outfit;
+                document.getElementById("pet-accessory").innerText = pet.accessory;
+                for (const stat of ["energy", "hunger", "hygiene", "happiness"]) {
+                    document.getElementById(`pet-${stat}-bar`).value = pet[stat];
+                    document.getElementById(`pet-${stat}-val`).innerText = pet[stat];
+                }
+            }
+        }
+    }
+
+    feedPet() {
+        if (this.isGameOver || !this.player.pet) return;
+        if (this.player.pet.foodStock <= 0) {
+            this.log("🚫 Você não tem ração! Compre no Pet Shop.");
+            return;
+        }
+        this.player.pet.foodStock -= 1;
+        this.player.modifyPetStat("hunger", -30);
+        this.player.modifyPetStat("energy", 10);
+        this.player.modifyPetStat("happiness", 5);
+        this.log(`🍖 Você alimentou **${this.player.pet.name}**! (-30 Fome, +10 Energia, +5 Felicidade)`);
+        this.updateUI();
+    }
+
+    renamePet(newName) {
+        if (this.isGameOver || !this.player.pet) return;
+        const input = newName !== undefined
+            ? newName
+            : (typeof prompt === "function" ? prompt("Novo nome para o pet:", this.player.pet.name) : "");
+        if (this.player.renamePet(input)) {
+            this.log(`✏️ Seu pet agora se chama **${this.player.pet.name}**!`);
+            this.updateUI();
+        }
     }
 
     log(message) {
         const logBox = document.getElementById("log");
-        logBox.innerHTML += `<p>• ${message}</p>`;
-        logBox.scrollTop = logBox.scrollHeight;
+        const formattedMessage = message.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+        logBox.innerHTML = `<p>• ${formattedMessage}</p>${logBox.innerHTML}`;
+        logBox.scrollTop = 0;
     }
 }
 
-// Inicializa o jogo
-const game = new GameEngine();
+let game = null;
+
+function showCharacterCreation() {
+    document.getElementById("start-menu-step").style.display = "none";
+    document.getElementById("character-creation-step").style.display = "block";
+    document.getElementById("creation-error").style.display = "none";
+    document.getElementById("input-name").focus();
+}
+
+function backToStartMenu() {
+    document.getElementById("character-creation-step").style.display = "none";
+    document.getElementById("import-game-step").style.display = "none";
+    document.getElementById("start-menu-step").style.display = "block";
+    document.getElementById("creation-error").style.display = "none";
+    document.getElementById("import-error").style.display = "none";
+}
+
+function showImportStep() {
+    document.getElementById("start-menu-step").style.display = "none";
+    document.getElementById("import-game-step").style.display = "block";
+    document.getElementById("import-error").style.display = "none";
+    document.getElementById("import-code").value = "";
+    document.getElementById("import-file").value = "";
+    document.getElementById("import-code").focus();
+}
+
+function handleImportFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        document.getElementById("import-code").value = String(e.target.result || "").trim();
+        document.getElementById("import-error").style.display = "none";
+    };
+    reader.readAsText(file);
+}
+
+function importSavedGame() {
+    const code = document.getElementById("import-code").value;
+    const errorEl = document.getElementById("import-error");
+
+    let data;
+    try {
+        data = importSaveState(code);
+    } catch (err) {
+        errorEl.innerText = err.message;
+        errorEl.style.display = "block";
+        return;
+    }
+
+    errorEl.style.display = "none";
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("game-container").style.display = "block";
+
+    game = GameEngine.fromSave(data);
+}
+
+function openSettingsModal() {
+    if (!game) return;
+    document.getElementById("export-code").value = exportSaveState(game, wardrobeOptions, market.catalog);
+    document.getElementById("settings-modal").style.display = "flex";
+}
+
+function closeSettingsModal() {
+    document.getElementById("settings-modal").style.display = "none";
+}
+
+function resetGlobalGameState() {
+    wardrobeOptions.forEach(item => {
+        item.owned = item.price === 0;
+    });
+    market.catalog.comida.forEach(item => {
+        item.stock = 0;
+    });
+
+    document.getElementById("log").innerHTML = "";
+    document.getElementById("input-name").value = "";
+    document.getElementById("import-code").value = "";
+    const importFile = document.getElementById("import-file");
+    if (importFile) importFile.value = "";
+
+    ["settings-modal", "wardrobe-modal", "gameover-modal"].forEach(id => {
+        document.getElementById(id).style.display = "none";
+    });
+    game = null;
+}
+
+function exitToStartScreen() {
+    if (!confirm("Voltar para a tela inicial? Todo progresso não exportado será perdido.")) return;
+
+    resetGlobalGameState();
+    document.getElementById("game-container").style.display = "none";
+    document.getElementById("start-screen").style.display = "block";
+    backToStartMenu();
+}
+
+function copySaveCode() {
+    const exportEl = document.getElementById("export-code");
+    if (!exportEl.value) return;
+
+    const logCopied = () => {
+        if (game) game.log("📋 Código de save copiado para a área de transferência!");
+    };
+    const fallbackCopy = () => {
+        exportEl.select();
+        document.execCommand("copy");
+        logCopied();
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(exportEl.value).then(logCopied).catch(fallbackCopy);
+        return;
+    }
+    fallbackCopy();
+}
+
+function downloadSaveFile() {
+    const code = document.getElementById("export-code").value;
+    if (!code) return;
+
+    const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeName = (game?.player?.name || "save").replace(/[^a-zA-Z0-9_-]/g, "_");
+    link.href = url;
+    link.download = `life-sandbox-${safeName}.txt`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (game) game.log("💾 Arquivo de save baixado!");
+}
+
+function startNewGame() {
+    const name = document.getElementById("input-name").value.trim();
+    const errorEl = document.getElementById("creation-error");
+
+    if (!name) {
+        errorEl.innerText = "Por favor, digite um nome para continuar.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const gender = document.getElementById("input-gender").value;
+    errorEl.style.display = "none";
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("game-container").style.display = "block";
+
+    game = new GameEngine(name, gender);
+}

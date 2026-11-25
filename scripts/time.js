@@ -7,7 +7,17 @@ class TimeSystem {
         this.hour = 8;
         this.minute = 0; // Novo controle explícito de minutos
         this.rentInterval = 7;
-        this.rentCost = 150;
+        this.baseRentCost = 150;
+        this.rentCost = this.baseRentCost;
+    }
+
+    updateRentCost(player) {
+        const upgradeIncreases = { patio: 50, piscina: 100 };
+        let extra = 0;
+        for (const [id, increase] of Object.entries(upgradeIncreases)) {
+            if (player.hasHouseUpgrade(id)) extra += increase;
+        }
+        this.rentCost = this.baseRentCost + extra;
     }
 
     // O parâmetro 'hours' pode receber frações como 0.5 (30 min) ou 1, 2, etc.
@@ -31,6 +41,12 @@ class TimeSystem {
 
         // Fome escala proporcionalmente com o tempo total em horas
         gameEngine.player.modifyHunger(2 * hours);
+        if (gameEngine.player.pet) {
+            gameEngine.player.modifyPetStat("hunger", 2 * hours);
+            gameEngine.player.modifyPetStat("energy", -1 * hours);
+            gameEngine.player.modifyPetStat("hygiene", -1 * hours);
+            gameEngine.player.modifyPetStat("happiness", -1 * hours);
+        }
         gameEngine.checkStatusConditions();
     }
 
@@ -48,6 +64,9 @@ class TimeSystem {
 
         // Avança o tempo usando a sua lógica existente de avanço de horas/dias
         this.advanceTime(hoursToAdvance, game);
+        if (game.player.pet) {
+            game.player.modifyPetStat("energy", 100);
+        }
     }
 
     onNewDay(gameEngine) {
@@ -59,6 +78,10 @@ class TimeSystem {
                 gameEngine.triggerGameOver(`Você não tinha R$ ${this.rentCost} para pagar o aluguel no Dia ${this.day} e foi despejado!`);
                 return;
             }
+        }
+
+        if (gameEngine.player.pet) {
+            gameEngine.player.modifyPetStat("energy", 100);
         }
 
         if (gameEngine.player.isEmployed) {
