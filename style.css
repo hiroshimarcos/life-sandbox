@@ -2,6 +2,7 @@
 body { font-family: Arial, sans-serif; background: #222; color: #fff; padding: 20px; margin: 0; }
 .container { max-width: 700px; width: 100%; margin: 0 auto; background: #333; padding: 20px; border-radius: 8px; position: relative; }
 .stats, .time-info, .job-info, .body-info, .pet-info { background: #444; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; line-height: 1.5; overflow-wrap: break-word; }
+.stats { background: #3b3a34; border-left: 4px solid #f39c12; }
 .job-info { background: #3a4750; border-left: 4px solid #17a2b8; }
 .body-info { background: #2e3d49; border-left: 4px solid #9b59b6; }
 .pet-info { background: #2d4238; border-left: 4px solid #2ecc71; }
@@ -9,9 +10,13 @@ body { font-family: Arial, sans-serif; background: #222; color: #fff; padding: 2
 .pet-actions { display: flex; gap: 6px; }
 .pet-actions button { padding: 4px 8px; font-size: 13px; }
 .pet-meta { font-size: 13px; margin-bottom: 8px; color: #dcdcdc; }
-.pet-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
-.pet-bars label { display: flex; align-items: center; gap: 6px; }
-.pet-bars progress { flex: 1; height: 12px; }
+.pet-bars, .stat-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+.pet-bars label, .stat-bars label { display: flex; align-items: center; gap: 6px; }
+.pet-bars progress, .stat-bars progress { flex: 1; height: 12px; }
+.stat-bars { margin-top: 6px; }
+.bar-energy { accent-color: #2ecc71; }
+.bar-hunger { accent-color: #e74c3c; }
+.bar-muscle, .bar-fat { accent-color: #3498db; }
 .actions-panel { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
 button { padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
 button:hover { background: #218838; }
@@ -90,7 +95,7 @@ button:disabled { background: #555; color: #888; cursor: not-allowed; }
     #room-title { font-size: 17px; }
     button { min-height: 42px; font-size: 14px; }
     .nav-menu button, .subroom-menu button { flex: 1 1 calc(50% - 8px); }
-    .pet-bars { grid-template-columns: 1fr; }
+    .pet-bars, .stat-bars { grid-template-columns: 1fr; }
     .wardrobe-options { grid-template-columns: 1fr; }
     .start-actions, .modal-actions { flex-direction: column; }
     .start-actions button, .modal-actions button { width: 100%; }

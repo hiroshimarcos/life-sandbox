@@ -50,6 +50,46 @@
                 <option value="outro">Outro / Não-binário</option>
             </select>
         </div>
+        <div class="form-group">
+            <label for="input-skin-tone">Tom da pele</label>
+            <select id="input-skin-tone">
+                <option value="claro">Claro</option>
+                <option value="medio_claro">Médio-claro</option>
+                <option value="medio" selected>Médio</option>
+                <option value="medio_escuro">Médio-escuro</option>
+                <option value="escuro">Escuro</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="input-height">Altura</label>
+            <select id="input-height">
+                <option value="baixo">Baixo(a)</option>
+                <option value="medio" selected>Médio(a)</option>
+                <option value="alto">Alto(a)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="input-hair-style">Tipo de cabelo</label>
+            <select id="input-hair-style">
+                <option value="curto" selected>Curto</option>
+                <option value="medio">Médio</option>
+                <option value="longo">Longo</option>
+                <option value="cacheado">Cacheado</option>
+                <option value="crespo">Crespo</option>
+                <option value="careca">Careca</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="input-hair-color">Cor do cabelo</label>
+            <select id="input-hair-color">
+                <option value="preto">Preto</option>
+                <option value="castanho" selected>Castanho</option>
+                <option value="loiro">Loiro</option>
+                <option value="ruivo">Ruivo</option>
+                <option value="grisalho">Grisalho</option>
+                <option value="colorido">Colorido</option>
+            </select>
+        </div>
         <div class="start-actions">
             <button class="btn-secondary" onclick="backToStartMenu()">Voltar</button>
             <button onclick="startNewGame()">Começar</button>
@@ -65,18 +105,25 @@
     
     <div class="stats">
         <strong>Nome:</strong> <span id="p-name"></span> | 
-        <strong>Gênero:</strong> <span id="p-gender"></span> | 
-        <strong>Energia:</strong> <span id="p-energy"></span>/100 | 
-        <strong>Fome:</strong> <span id="p-hunger"></span>/100 | 
-        <strong>Dinheiro:</strong> R$ <span id="p-money"></span><br>
+        <strong>Dinheiro:</strong> R$ <span id="p-money"></span> | 
         <strong>Roupa:</strong> <span id="p-clothes" style="color: #17a2b8;"></span>
+        <div class="stat-bars">
+            <label>⚡ Energia: <progress id="p-energy-bar" class="bar-energy" max="100" value="100"></progress> <span id="p-energy"></span>/100</label>
+            <label>🍖 Fome: <progress id="p-hunger-bar" class="bar-hunger" max="100" value="0"></progress> <span id="p-hunger"></span>/100</label>
+        </div>
     </div>
 
     <div class="body-info">
-        <strong>💪 Porte Físico:</strong> <span id="p-body-type" style="color: #9b59b6; font-weight: bold;"></span> | 
-        <strong>Músculo:</strong> <span id="p-muscle"></span>/100 | 
-        <strong>Gordura:</strong> <span id="p-fat"></span>/100<br>
+        <strong>Gênero:</strong> <span id="p-gender"></span> | 
+        <strong>💪 Porte Físico:</strong> <span id="p-body-type" style="color: #9b59b6; font-weight: bold;"></span><br>
+        <strong>Pele:</strong> <span id="p-skin-tone"></span> | 
+        <strong>Altura:</strong> <span id="p-height"></span> | 
+        <strong>Cabelo:</strong> <span id="p-hair"></span><br>
         <small id="p-body-desc" style="color: #bdc3c7; font-style: italic;"></small>
+        <div class="stat-bars">
+            <label>💪 Músculo: <progress id="p-muscle-bar" class="bar-muscle" max="100" value="15"></progress> <span id="p-muscle"></span>/100</label>
+            <label>🍔 Gordura: <progress id="p-fat-bar" class="bar-fat" max="100" value="35"></progress> <span id="p-fat"></span>/100</label>
+        </div>
     </div>
 
     <div id="job-info-panel" class="job-info"></div>
@@ -116,6 +163,7 @@
         <button onclick="game.changeLocation('mercado')">🛒 Mercado</button>
         <button onclick="game.changeLocation('imobiliaria')">🏗️ Imobiliária (09h-18h)</button>
         <button onclick="game.changeLocation('petshop')">🐾 Pet Shop (09h-18h)</button>
+        <button onclick="game.changeLocation('cabeleireiro')">💇 Cabeleireiro (09h-18h)</button>
     </div>
     <!-- TÍTULO DO LOCAL ATUAL -->
     <h3 id="room-title">🏠 Casa - Quarto</h3>
