@@ -45,13 +45,17 @@ const BODY_TYPE_GENDER_NAMES = {
 // SISTEMA DO PLAYER
 // ==========================================
 class Player {
-    constructor(name, gender = "masculino") {
+    constructor(name, gender = "masculino", appearance = {}) {
         this.name = name;
         this.gender = gender;
+        this.skinTone = appearance.skinTone || "medio";
+        this.height = appearance.height || "medio";
+        this.hairStyle = appearance.hairStyle || "curto";
+        this.hairColor = appearance.hairColor || "castanho";
         this.energy = 100;
         this.maxEnergy = 100;
         this.hunger = 0;
-        this.money = 100000
+        this.money = 150;
         this.clothes = "pijama";
 
         this.fat = 35;
@@ -82,6 +86,11 @@ class Player {
     setClothes(outfitIdOrName) {
         const match = wardrobeOptions.find(o => o.id === outfitIdOrName || o.name === outfitIdOrName);
         this.clothes = match ? match.id : outfitIdOrName;
+    }
+
+    setHair(hairStyle, hairColor) {
+        if (hairStyle) this.hairStyle = hairStyle;
+        if (hairColor) this.hairColor = hairColor;
     }
 
     getClothesName() {

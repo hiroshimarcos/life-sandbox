@@ -4,13 +4,46 @@ const GENDER_LABELS = {
     outro: "Outro / Não-binário"
 };
 
+const SKIN_TONE_LABELS = {
+    claro: "Claro",
+    medio_claro: "Médio-claro",
+    medio: "Médio",
+    medio_escuro: "Médio-escuro",
+    escuro: "Escuro"
+};
+
+const HEIGHT_LABELS = {
+    baixo: "Baixo(a)",
+    medio: "Médio(a)",
+    alto: "Alto(a)"
+};
+
+const HAIR_STYLE_LABELS = {
+    curto: "Curto",
+    medio: "Médio",
+    longo: "Longo",
+    cacheado: "Cacheado",
+    crespo: "Crespo",
+    careca: "Careca"
+};
+
+const HAIR_COLOR_LABELS = {
+    preto: "Preto",
+    castanho: "Castanho",
+    loiro: "Loiro",
+    ruivo: "Ruivo",
+    grisalho: "Grisalho",
+    colorido: "Colorido"
+};
+
 const ENV_TITLES = {
     casa: "🏠 Casa",
     academia: "🏋️ Academia",
     trabalho: "💼 Trabalho",
     mercado: "🛒 Mercado",
     imobiliaria: "🏗️ Imobiliária",
-    petshop: "🐾 Pet Shop"
+    petshop: "🐾 Pet Shop",
+    cabeleireiro: "💇 Cabeleireiro"
 };
 
 const INDECENT_OUTFITS = ["pijama", "praia", "fantasia"];
@@ -19,8 +52,8 @@ const INDECENT_OUTFITS = ["pijama", "praia", "fantasia"];
 // MOTOR DO JOGO (GERENCIADOR)
 // ==========================================
 class GameEngine {
-    constructor(playerName = "Alex", playerGender = "masculino", savedData = null) {
-        this.player = new Player(playerName, playerGender);
+    constructor(playerName = "Alex", playerGender = "masculino", savedData = null, appearance = {}) {
+        this.player = new Player(playerName, playerGender, appearance);
         this.time = new TimeSystem();
         
         // Controle de localização atualizada
@@ -49,6 +82,10 @@ class GameEngine {
         Object.assign(this.player, {
             name: data.player.name,
             gender: data.player.gender || "masculino",
+            skinTone: data.player.skinTone || "medio",
+            height: data.player.height || "medio",
+            hairStyle: data.player.hairStyle || "curto",
+            hairColor: data.player.hairColor || "castanho",
             energy: toNum(data.player.energy, this.player.energy),
             maxEnergy: toNum(data.player.maxEnergy, this.player.maxEnergy),
             hunger: toNum(data.player.hunger, this.player.hunger),
@@ -169,6 +206,17 @@ class GameEngine {
             }
             if (INDECENT_OUTFITS.includes(this.player.clothes)) {
                 this.log("🚫 **ENTRADA PROIBIDA!** Você precisa estar vestindo uma roupa adequada para entrar no Pet Shop.");
+                return;
+            }
+        }
+
+        if (envKey === "cabeleireiro") {
+            if (this.time.hour < 9 || this.time.hour >= 18) {
+                this.log("💇 **CABELEIREIRO FECHADO!** O horário de funcionamento é das 09:00 às 18:00.");
+                return;
+            }
+            if (INDECENT_OUTFITS.includes(this.player.clothes)) {
+                this.log("🚫 **ENTRADA PROIBIDA!** Você precisa estar vestindo uma roupa adequada para entrar no Cabeleireiro.");
                 return;
             }
         }
@@ -470,6 +518,21 @@ class GameEngine {
         document.getElementById("p-muscle").innerText = this.player.muscle;
         document.getElementById("p-fat").innerText = this.player.fat;
 
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value;
+        };
+        const styleLabel = HAIR_STYLE_LABELS[this.player.hairStyle] || this.player.hairStyle;
+        const colorLabel = HAIR_COLOR_LABELS[this.player.hairColor] || this.player.hairColor;
+        setText("p-skin-tone", SKIN_TONE_LABELS[this.player.skinTone] || this.player.skinTone);
+        setText("p-height", HEIGHT_LABELS[this.player.height] || this.player.height);
+        setText("p-hair", this.player.hairStyle === "careca" ? "Careca" : `${styleLabel} (${colorLabel})`);
+
+        for (const stat of ["energy", "hunger", "muscle", "fat"]) {
+            const bar = document.getElementById(`p-${stat}-bar`);
+            if (bar) bar.value = this.player[stat];
+        }
+
         const jobPanel = document.getElementById("job-info-panel");
         if (this.player.isEmployed) {
             jobPanel.innerHTML = `<strong>Status Profissional:</strong> Empregado | <strong>Tarefas Acumuladas:</strong> ${this.player.taskQueue}/10 (⚠️ Demissão aos 10) | <strong>Expediente:</strong> 09:00 às 18:00`;
@@ -620,8 +683,20 @@ function resetGlobalGameState() {
     if (importFile) importFile.value = "";
 
     ["settings-modal", "wardrobe-modal", "gameover-modal"].forEach(id => {
-        document.getElementById(id).style.display = "none";
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
     });
+    const creationDefaults = {
+        "input-gender": "masculino",
+        "input-skin-tone": "medio",
+        "input-height": "medio",
+        "input-hair-style": "curto",
+        "input-hair-color": "castanho"
+    };
+    for (const [id, val] of Object.entries(creationDefaults)) {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    }
     game = null;
 }
 
@@ -680,9 +755,15 @@ function startNewGame() {
     }
 
     const gender = document.getElementById("input-gender").value;
+    const appearance = {
+        skinTone: document.getElementById("input-skin-tone")?.value || "medio",
+        height: document.getElementById("input-height")?.value || "medio",
+        hairStyle: document.getElementById("input-hair-style")?.value || "curto",
+        hairColor: document.getElementById("input-hair-color")?.value || "castanho"
+    };
     errorEl.style.display = "none";
     document.getElementById("start-screen").style.display = "none";
     document.getElementById("game-container").style.display = "block";
 
-    game = new GameEngine(name, gender);
+    game = new GameEngine(name, gender, null, appearance);
 }

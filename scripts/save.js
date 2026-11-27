@@ -19,6 +19,10 @@ function exportSaveState(game, wardrobeList, marketData) {
         player: {
             name: game.player.name,
             gender: game.player.gender,
+            skinTone: game.player.skinTone,
+            height: game.player.height,
+            hairStyle: game.player.hairStyle,
+            hairColor: game.player.hairColor,
             energy: game.player.energy,
             maxEnergy: game.player.maxEnergy,
             hunger: game.player.hunger,

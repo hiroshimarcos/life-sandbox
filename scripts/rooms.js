@@ -1,6 +1,32 @@
 // ==========================================
 // AMBIENTES E SUBROOMS (CÔMODOS)
 // ==========================================
+function buildHairActions(options, prop, price, onApply, customExecute) {
+    return options.map(([id, label, icon]) => ({
+        label: `${icon} ${label} (R$ ${price})`,
+        costEnergy: 0,
+        costHours: 1,
+        execute: (game) => {
+            if (game.player[prop] === id) {
+                game.log(`💇 Você já está com esse visual (${label}).`);
+                return;
+            }
+            if (game.player.money < price) {
+                game.log(`❌ Dinheiro insuficiente! Você precisa de R$ ${price}.`);
+                return;
+            }
+            if (customExecute) {
+                customExecute(game, id, label);
+                return;
+            }
+            game.player.money -= price;
+            game.time.advanceTime(1, game);
+            onApply(game, id);
+            game.log(`💇 Visual atualizado para **${label}**! (-R$ ${price})`);
+        }
+    }));
+}
+
 function buyHouseUpgrade(game, upgradeId, label, price) {
     if (game.player.hasHouseUpgrade(upgradeId)) return;
     if (game.player.money < price) {
@@ -617,6 +643,60 @@ const rooms = {
                         }
                     }
                 ]
+            }
+        }
+    },
+
+    cabeleireiro: {
+        name: "💇 Cabeleireiro",
+        isEnvironment: true,
+        subRooms: {
+            corte: {
+                name: "Corte de Cabelo",
+                actions: buildHairActions(
+                    [
+                        ["curto", "Curto", "✂️"],
+                        ["medio", "Médio", "✂️"],
+                        ["longo", "Longo", "✂️"],
+                        ["cacheado", "Cacheado", "✂️"],
+                        ["crespo", "Crespo", "✂️"],
+                        ["careca", "Careca", "✂️"]
+                    ],
+                    "hairStyle",
+                    40,
+                    null,
+                    (game, id, label) => {
+                        minigame.openHaircutGame(id, game.player.hairColor, (success, canceled) => {
+                            if (canceled) {
+                                game.log("✂️ Você desistiu do corte de cabelo.");
+                                return;
+                            }
+                            if (!success) return;
+                            game.player.money -= 40;
+                            game.time.advanceTime(1, game);
+                            game.player.setHair(id, null);
+                            game.log(`✂️ Visual atualizado para **${label}**! (-R$ 40)`);
+                            game.updateUI();
+                            game.renderActions();
+                        });
+                    }
+                )
+            },
+            tintura: {
+                name: "Coloração",
+                actions: buildHairActions(
+                    [
+                        ["preto", "Preto", "🎨"],
+                        ["castanho", "Castanho", "🎨"],
+                        ["loiro", "Loiro", "🎨"],
+                        ["ruivo", "Ruivo", "🎨"],
+                        ["grisalho", "Grisalho", "🎨"],
+                        ["colorido", "Colorido", "🎨"]
+                    ],
+                    "hairColor",
+                    50,
+                    (game, id) => game.player.setHair(null, id)
+                )
             }
         }
     }

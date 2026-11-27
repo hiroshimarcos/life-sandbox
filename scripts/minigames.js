@@ -1,3 +1,21 @@
+const HAIR_COLOR_HEX = {
+    preto: "#1c1c1c",
+    castanho: "#6b4226",
+    loiro: "#e6c24a",
+    ruivo: "#c04d26",
+    grisalho: "#9ea7ad",
+    colorido: "#e84393"
+};
+
+const HAIRCUT_CUT_Y = {
+    careca: 35,
+    curto: 65,
+    medio: 115,
+    longo: 170,
+    cacheado: 115,
+    crespo: 95
+};
+
 // ==========================================
 // GERENCIADOR DE MINIJOGOS
 // ==========================================
@@ -457,6 +475,145 @@ class MinigameManager {
                 this.finishTask(true, "🚿 **BANHO CONCLUÍDO!** Você está limpo, revigorado e cheiroso!");
             }
         };
+    }
+
+    openHaircutGame(targetStyle, hairColor, onCompleteCallback) {
+        this.resetModalState();
+        this.onComplete = onCompleteCallback;
+        this.modal.style.display = "flex";
+        this.startHaircutMinigame(targetStyle, hairColor);
+    }
+
+    startHaircutMinigame(targetStyle, hairColor) {
+        this.title.innerText = "✂️ Corte de Cabelo";
+        this.desc.innerText = "Passe o mouse ou o dedo sobre a linha tracejada horizontal para cortar os fios (Meta: 85%)!";
+
+        this.area.innerHTML = `
+            <div style="position: relative; width: 300px; height: 220px; margin: 0 auto; background: #4a5568; border-radius: 8px; overflow: hidden; cursor: crosshair;">
+                <canvas id="haircut-canvas" width="300" height="220" style="display: block;"></canvas>
+                <div id="haircut-progress-text" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 14px; pointer-events: none;">0%</div>
+            </div>
+        `;
+
+        const canvas = document.getElementById("haircut-canvas");
+        const ctx = canvas.getContext("2d");
+        const progressText = document.getElementById("haircut-progress-text");
+
+        const strokeColor = HAIR_COLOR_HEX[hairColor] || "#6b4226";
+        const cutY = HAIRCUT_CUT_Y[targetStyle] ?? 115;
+        const isWavy = targetStyle === "cacheado" || targetStyle === "crespo";
+        const waveFreq = targetStyle === "crespo" ? 0.28 : 0.14;
+        const waveAmp = targetStyle === "crespo" ? 4.5 : 6;
+
+        const segmentsCount = 20;
+        const cutSegments = new Array(segmentsCount).fill(false);
+        const segWidth = canvas.width / segmentsCount;
+
+        const drawHairStrand = (x, endY) => {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            if (isWavy) {
+                for (let y = 2; y <= endY; y += 3) {
+                    ctx.lineTo(x + Math.sin(y * waveFreq) * waveAmp, y);
+                }
+            } else {
+                ctx.lineTo(x, endY);
+            }
+            ctx.stroke();
+        };
+
+        const drawScene = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = "round";
+
+            for (let i = 0; i < segmentsCount; i++) {
+                const endY = cutSegments[i] ? cutY : canvas.height;
+                const baseX = i * segWidth;
+                drawHairStrand(baseX + segWidth * 0.28, endY);
+                drawHairStrand(baseX + segWidth * 0.72, endY);
+            }
+
+            ctx.save();
+            ctx.strokeStyle = "#f1c40f";
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(0, cutY);
+            ctx.lineTo(canvas.width, cutY);
+            ctx.stroke();
+            ctx.restore();
+        };
+
+        drawScene();
+
+        let isCutting = false;
+
+        const getPos = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const point = e.touches && e.touches.length > 0 ? e.touches[0] : e;
+            return {
+                x: (point.clientX || 0) - rect.left,
+                y: (point.clientY || 0) - rect.top
+            };
+        };
+
+        const cutAt = (pos) => {
+            if (this.isCompleted) return;
+            if (Math.abs(pos.y - cutY) > 22) return;
+
+            const idx = Math.floor(pos.x / segWidth);
+            if (idx < 0 || idx >= segmentsCount || cutSegments[idx]) return;
+
+            cutSegments[idx] = true;
+            drawScene();
+
+            const cutCount = cutSegments.filter(Boolean).length;
+            const percentage = Math.round((cutCount / segmentsCount) * 100);
+            progressText.innerText = `${percentage}%`;
+
+            if (percentage >= 85) {
+                cleanup();
+                this.finishTask(true, "✂️ **CORTE CONCLUÍDO!** Novo visual finalizado com precisão!");
+            }
+        };
+
+        const startCut = (e) => {
+            if (this.isCompleted) return;
+            isCutting = true;
+            if (e.touches) e.preventDefault();
+            cutAt(getPos(e));
+        };
+
+        const moveCut = (e) => {
+            if (!isCutting || this.isCompleted) return;
+            e.preventDefault();
+            cutAt(getPos(e));
+        };
+
+        const stopCut = () => {
+            isCutting = false;
+        };
+
+        const cleanup = () => {
+            canvas.removeEventListener("mousedown", startCut);
+            canvas.removeEventListener("mousemove", moveCut);
+            canvas.removeEventListener("mouseup", stopCut);
+            canvas.removeEventListener("mouseleave", stopCut);
+            canvas.removeEventListener("touchstart", startCut);
+            canvas.removeEventListener("touchmove", moveCut);
+            canvas.removeEventListener("touchend", stopCut);
+        };
+
+        canvas.addEventListener("mousedown", startCut);
+        canvas.addEventListener("mousemove", moveCut);
+        canvas.addEventListener("mouseup", stopCut);
+        canvas.addEventListener("mouseleave", stopCut);
+        canvas.addEventListener("touchstart", startCut);
+        canvas.addEventListener("touchmove", moveCut);
+        canvas.addEventListener("touchend", stopCut);
     }
 }
 

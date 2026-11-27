@@ -101,6 +101,34 @@ describe('Player & Body Types', () => {
         assert.equal(player.clothes, 'casual');
         assert.equal(player.getClothesName(), 'Camiseta e Jeans 👕');
     });
+
+    test('Player inicializa aparência com defaults ou valores passados e setHair atualiza apenas o cabelo', () => {
+        const ctx = loadScript(path.resolve('scripts/player.js'), {});
+
+        const defaultPlayer = new ctx.Player('Alex');
+        assert.equal(defaultPlayer.skinTone, 'medio');
+        assert.equal(defaultPlayer.height, 'medio');
+        assert.equal(defaultPlayer.hairStyle, 'curto');
+        assert.equal(defaultPlayer.hairColor, 'castanho');
+
+        const customPlayer = new ctx.Player('Maria', 'feminino', {
+            skinTone: 'escuro',
+            height: 'alto',
+            hairStyle: 'cacheado',
+            hairColor: 'preto'
+        });
+        assert.equal(customPlayer.skinTone, 'escuro');
+        assert.equal(customPlayer.height, 'alto');
+        assert.equal(customPlayer.hairStyle, 'cacheado');
+        assert.equal(customPlayer.hairColor, 'preto');
+
+        customPlayer.setHair('longo', 'ruivo');
+        assert.equal(customPlayer.hairStyle, 'longo');
+        assert.equal(customPlayer.hairColor, 'ruivo');
+
+        const protoMethods = Object.getOwnPropertyNames(ctx.Player.prototype);
+        assert.equal(protoMethods.some(m => /^set(Gender|SkinTone|Height)$/i.test(m)), false);
+    });
 });
 
 describe('Time System', () => {
@@ -218,6 +246,11 @@ describe('HTML Integrity', () => {
         assert.match(html, /onclick="game\.changeLocation\('petshop'\)"/);
     });
 
+    test('presença do botão do Cabeleireiro no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
+        assert.match(html, /onclick="game\.changeLocation\('cabeleireiro'\)"/);
+    });
+
     test('presença do ID t-rent-cost no index.html', () => {
         const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
         const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
@@ -238,6 +271,39 @@ describe('HTML Integrity', () => {
 
         petIds.forEach(id => {
             assert.equal(ids.has(id), true, `ID ausente no index.html: ${id}`);
+        });
+    });
+
+    test('presença dos IDs de aparência no index.html e ausência de hair-modal', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
+        const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
+        const appearanceIds = [
+            'input-skin-tone',
+            'input-height',
+            'input-hair-style',
+            'input-hair-color',
+            'p-skin-tone',
+            'p-height',
+            'p-hair'
+        ];
+
+        appearanceIds.forEach(id => {
+            assert.equal(ids.has(id), true, `ID ausente no index.html: ${id}`);
+        });
+        assert.equal(ids.has('hair-modal'), false, 'ID hair-modal não deve existir no index.html');
+    });
+
+    test('presença dos IDs e classes das barras de status do jogador no index.html', () => {
+        const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
+        const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
+        const barIds = ['p-energy-bar', 'p-hunger-bar', 'p-muscle-bar', 'p-fat-bar'];
+        barIds.forEach(id => {
+            assert.equal(ids.has(id), true, `ID ausente no index.html: ${id}`);
+        });
+
+        const barClasses = ['bar-energy', 'bar-hunger', 'bar-muscle', 'bar-fat'];
+        barClasses.forEach(cls => {
+            assert.match(html, new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"`), `Classe ausente no index.html: ${cls}`);
         });
     });
 });
@@ -265,6 +331,63 @@ describe('Character Creation', () => {
 
         assert.equal(elements['creation-error'].style.display, 'block');
         assert.ok(elements['creation-error'].innerText.length > 0);
+    });
+
+    test('startNewGame lê inputs de aparência e updateUI exibe pele, altura e cabelo (incluindo Careca)', () => {
+        const playerCtx = loadScript(path.resolve('scripts/player.js'), {});
+        let createdPlayer = null;
+        class SpyPlayer extends playerCtx.Player {
+            constructor(...args) {
+                super(...args);
+                createdPlayer = this;
+            }
+        }
+
+        const { mainCtx, elements } = setupGameContext({ Player: SpyPlayer });
+        elements.set('input-name', { value: 'Marina' });
+        elements.set('input-gender', { value: 'feminino' });
+        elements.set('input-skin-tone', { value: 'medio_escuro' });
+        elements.set('input-height', { value: 'alto' });
+        elements.set('input-hair-style', { value: 'cacheado' });
+        elements.set('input-hair-color', { value: 'ruivo' });
+
+        mainCtx.startNewGame();
+
+        assert.ok(createdPlayer);
+        assert.equal(createdPlayer.name, 'Marina');
+        assert.equal(createdPlayer.gender, 'feminino');
+        assert.equal(createdPlayer.skinTone, 'medio_escuro');
+        assert.equal(createdPlayer.height, 'alto');
+        assert.equal(createdPlayer.hairStyle, 'cacheado');
+        assert.equal(createdPlayer.hairColor, 'ruivo');
+
+        assert.equal(elements.get('p-skin-tone').innerText, 'Médio-escuro');
+        assert.equal(elements.get('p-height').innerText, 'Alto(a)');
+        assert.equal(elements.get('p-hair').innerText, 'Cacheado (Ruivo)');
+
+        const baldEngine = new mainCtx.GameEngine('Marina', 'feminino', null, {
+            hairStyle: 'careca',
+            hairColor: 'loiro'
+        });
+        assert.equal(baldEngine.player.hairStyle, 'careca');
+        assert.equal(elements.get('p-hair').innerText, 'Careca');
+    });
+
+    test('updateUI atualiza .value das barras de energia, fome, músculo e gordura do jogador', () => {
+        const { mainCtx, elements } = setupGameContext();
+        const engine = new mainCtx.GameEngine('Marina', 'feminino');
+
+        engine.player.energy = 64;
+        engine.player.hunger = 28;
+        engine.player.muscle = 42;
+        engine.player.fat = 19;
+
+        engine.updateUI();
+
+        assert.equal(elements.get('p-energy-bar').value, 64);
+        assert.equal(elements.get('p-hunger-bar').value, 28);
+        assert.equal(elements.get('p-muscle-bar').value, 42);
+        assert.equal(elements.get('p-fat-bar').value, 19);
     });
 });
 
@@ -509,6 +632,34 @@ describe('Save System', () => {
         assert.equal(engine.player.clothes, 'esporte');
         assert.equal(engine.player.getClothesName(), 'Roupa Esportiva 🏃');
     });
+
+    test('exportSaveState e GameEngine.fromSave preservam aparência e aplicam fallbacks em saves antigos', () => {
+        const saveCtx = loadSaveScript();
+        const { mainCtx } = setupGameContext();
+
+        const original = new mainCtx.GameEngine('Lara', 'feminino', null, {
+            skinTone: 'claro',
+            height: 'baixo',
+            hairStyle: 'crespo',
+            hairColor: 'colorido'
+        });
+        const code = saveCtx.exportSaveState(original, [], { comida: [] });
+        const restored = mainCtx.GameEngine.fromSave(saveCtx.importSaveState(code));
+
+        assert.equal(restored.player.skinTone, 'claro');
+        assert.equal(restored.player.height, 'baixo');
+        assert.equal(restored.player.hairStyle, 'crespo');
+        assert.equal(restored.player.hairColor, 'colorido');
+
+        const legacyEngine = mainCtx.GameEngine.fromSave({
+            player: { name: 'Legacy' },
+            time: { day: 1, hour: 8, minute: 0 }
+        });
+        assert.equal(legacyEngine.player.skinTone, 'medio');
+        assert.equal(legacyEngine.player.height, 'medio');
+        assert.equal(legacyEngine.player.hairStyle, 'curto');
+        assert.equal(legacyEngine.player.hairColor, 'castanho');
+    });
 });
 
 describe('Exit to Start Screen', () => {
@@ -528,6 +679,11 @@ describe('Exit to Start Screen', () => {
         const elements = {
             log: { innerHTML: '<p>Evento</p>' },
             'input-name': { value: 'Alex' },
+            'input-gender': { value: 'outro' },
+            'input-skin-tone': { value: 'escuro' },
+            'input-height': { value: 'alto' },
+            'input-hair-style': { value: 'longo' },
+            'input-hair-color': { value: 'colorido' },
             'import-code': { value: 'LS1:123:abc' },
             'import-file': { value: 'save.txt' },
             'settings-modal': { style: { display: 'flex' } },
@@ -586,6 +742,11 @@ describe('Exit to Start Screen', () => {
         assert.equal(elements['settings-modal'].style.display, 'none');
         assert.equal(elements['wardrobe-modal'].style.display, 'none');
         assert.equal(elements['gameover-modal'].style.display, 'none');
+        assert.equal(elements['input-gender'].value, 'masculino');
+        assert.equal(elements['input-skin-tone'].value, 'medio');
+        assert.equal(elements['input-height'].value, 'medio');
+        assert.equal(elements['input-hair-style'].value, 'curto');
+        assert.equal(elements['input-hair-color'].value, 'castanho');
         assert.equal(elements['game-container'].style.display, 'none');
         assert.equal(elements['start-screen'].style.display, 'block');
         assert.equal(elements['start-menu-step'].style.display, 'block');
@@ -1337,5 +1498,315 @@ describe('Interações com o Pet (Sala e Pátio)', () => {
         assert.equal(elements.get('log').scrollTop, 0);
     });
 });
+
+describe('Cabeleireiro', () => {
+    test('banheiro não possui mais a ação "🪞 Mudar Cabelo"', () => {
+        const { roomsCtx } = setupGameContext();
+        const hairAction = roomsCtx.rooms.casa.subRooms.banheiro.actions.find(
+            a => a.label === '🪞 Mudar Cabelo'
+        );
+        assert.equal(hairAction, undefined);
+    });
+
+    test('changeLocation("cabeleireiro") bloqueia fora do horário (08h e 18h)', () => {
+        const { mainCtx, elements } = setupGameContext();
+        const engine = new mainCtx.GameEngine('Alex');
+        engine.player.clothes = 'casual';
+
+        engine.time.hour = 8;
+        engine.changeLocation('cabeleireiro');
+        assert.equal(engine.currentEnvironment, 'casa');
+        assert.match(elements.get('log').innerHTML, /CABELEIREIRO FECHADO/);
+
+        engine.time.hour = 18;
+        engine.changeLocation('cabeleireiro');
+        assert.equal(engine.currentEnvironment, 'casa');
+        assert.match(elements.get('log').innerHTML, /CABELEIREIRO FECHADO/);
+    });
+
+    test('changeLocation("cabeleireiro") bloqueia às 10h vestindo roupa inadequada ("pijama")', () => {
+        const { mainCtx, elements } = setupGameContext();
+        const engine = new mainCtx.GameEngine('Alex');
+        engine.time.hour = 10;
+        engine.player.clothes = 'pijama';
+
+        engine.changeLocation('cabeleireiro');
+        assert.equal(engine.currentEnvironment, 'casa');
+        assert.match(elements.get('log').innerHTML, /ENTRADA PROIBIDA/);
+    });
+
+    test('estabelecimentos comerciais bloqueiam "pijama" e "praia" (cabeleireiro, mercado, imobiliaria, petshop)', () => {
+        for (const env of ['cabeleireiro', 'mercado', 'imobiliaria', 'petshop']) {
+            for (const outfit of ['pijama', 'praia']) {
+                const { mainCtx, elements } = setupGameContext();
+                const engine = new mainCtx.GameEngine('Alex');
+                engine.time.hour = 10;
+                engine.player.clothes = outfit;
+
+                engine.changeLocation(env);
+                assert.equal(engine.currentEnvironment, 'casa', `${env} deveria bloquear ${outfit}`);
+                assert.match(elements.get('log').innerHTML, /ENTRADA PROIBIDA/);
+            }
+        }
+    });
+
+    test('changeLocation("cabeleireiro") permite entrar entre 09h e 17h59 vestindo "casual" e atualiza #room-title', () => {
+        const { mainCtx, roomsCtx, elements } = setupGameContext();
+        const engine = new mainCtx.GameEngine('Alex');
+        engine.player.clothes = 'casual';
+        engine.time.hour = 9;
+
+        engine.changeLocation('cabeleireiro');
+        assert.equal(engine.currentEnvironment, 'cabeleireiro');
+        assert.equal(engine.currentSubRoom, 'corte');
+        assert.equal(elements.get('room-title').innerText, '💇 Cabeleireiro - Corte de Cabelo');
+        assert.deepEqual(Object.keys(roomsCtx.rooms.cabeleireiro.subRooms), ['corte', 'tintura']);
+    });
+
+    test('sub-ambiente corte bloqueia estilo atual, saldo < R$ 40, trata desistência e aplica corte no sucesso mantendo hairColor', () => {
+        let nextResult = [true, false];
+        const calls = [];
+        const { mainCtx, roomsCtx, elements } = setupGameContext({
+            minigame: {
+                openHaircutGame(targetStyle, hairColor, cb) {
+                    calls.push({ targetStyle, hairColor });
+                    cb(...nextResult);
+                }
+            }
+        });
+        const engine = new mainCtx.GameEngine('Alex', 'masculino', null, {
+            hairStyle: 'curto',
+            hairColor: 'castanho'
+        });
+        engine.time.hour = 10;
+
+        const sameCut = roomsCtx.rooms.cabeleireiro.subRooms.corte.actions.find(
+            a => a.label.includes('Curto')
+        );
+        const longCut = roomsCtx.rooms.cabeleireiro.subRooms.corte.actions.find(
+            a => a.label.includes('Longo')
+        );
+        assert.ok(sameCut);
+        assert.ok(longCut);
+
+        engine.player.money = 100;
+        sameCut.execute(engine);
+        assert.equal(calls.length, 0);
+        assert.equal(engine.player.money, 100);
+        assert.equal(engine.time.hour, 10);
+        assert.equal(engine.player.hairStyle, 'curto');
+        assert.match(elements.get('log').innerHTML, /já está com esse visual/);
+
+        engine.player.money = 39;
+        longCut.execute(engine);
+        assert.equal(calls.length, 0);
+        assert.equal(engine.player.money, 39);
+        assert.equal(engine.time.hour, 10);
+        assert.equal(engine.player.hairStyle, 'curto');
+        assert.match(elements.get('log').innerHTML, /Dinheiro insuficiente/);
+
+        engine.player.money = 40;
+        nextResult = [false, true];
+        longCut.execute(engine);
+        assert.equal(calls.length, 1);
+        assert.deepEqual(calls[0], { targetStyle: 'longo', hairColor: 'castanho' });
+        assert.equal(engine.player.money, 40);
+        assert.equal(engine.time.hour, 10);
+        assert.equal(engine.player.hairStyle, 'curto');
+        assert.match(elements.get('log').innerHTML, /desistiu do corte/);
+
+        nextResult = [true, false];
+        longCut.execute(engine);
+        assert.equal(calls.length, 2);
+        assert.deepEqual(calls[1], { targetStyle: 'longo', hairColor: 'castanho' });
+        assert.equal(engine.player.money, 0);
+        assert.equal(engine.time.hour, 11);
+        assert.equal(engine.player.hairStyle, 'longo');
+        assert.equal(engine.player.hairColor, 'castanho');
+    });
+
+    test('sub-ambiente tintura bloqueia cor atual, saldo < R$ 50, e aplica cor com saldo >= R$ 50 mantendo hairStyle', () => {
+        const { mainCtx, roomsCtx, elements } = setupGameContext();
+        const engine = new mainCtx.GameEngine('Alex', 'masculino', null, {
+            hairStyle: 'longo',
+            hairColor: 'castanho'
+        });
+        engine.time.hour = 11;
+
+        const sameColor = roomsCtx.rooms.cabeleireiro.subRooms.tintura.actions.find(
+            a => a.label.includes('Castanho')
+        );
+        const blondeColor = roomsCtx.rooms.cabeleireiro.subRooms.tintura.actions.find(
+            a => a.label.includes('Loiro')
+        );
+        assert.ok(sameColor);
+        assert.ok(blondeColor);
+
+        engine.player.money = 100;
+        sameColor.execute(engine);
+        assert.equal(engine.player.money, 100);
+        assert.equal(engine.time.hour, 11);
+        assert.equal(engine.player.hairColor, 'castanho');
+        assert.match(elements.get('log').innerHTML, /já está com esse visual/);
+
+        engine.player.money = 49;
+        blondeColor.execute(engine);
+        assert.equal(engine.player.money, 49);
+        assert.equal(engine.time.hour, 11);
+        assert.equal(engine.player.hairColor, 'castanho');
+        assert.match(elements.get('log').innerHTML, /Dinheiro insuficiente/);
+
+        engine.player.money = 50;
+        blondeColor.execute(engine);
+        assert.equal(engine.player.money, 0);
+        assert.equal(engine.time.hour, 12);
+        assert.equal(engine.player.hairColor, 'loiro');
+        assert.equal(engine.player.hairStyle, 'longo');
+    });
+});
+
+function setupHaircutMinigameContext() {
+    const moves = [];
+    const lines = [];
+    const lineDashes = [];
+    const strokeStyles = [];
+    const listeners = {};
+    let currentStrokeStyle = '';
+
+    const ctx = {
+        lineWidth: 0,
+        lineCap: '',
+        get strokeStyle() {
+            return currentStrokeStyle;
+        },
+        set strokeStyle(val) {
+            currentStrokeStyle = val;
+            strokeStyles.push(val);
+        },
+        clearRect() {},
+        beginPath() {},
+        moveTo(x, y) {
+            moves.push({ x, y });
+        },
+        lineTo(x, y) {
+            lines.push({ x, y, strokeStyle: currentStrokeStyle });
+        },
+        stroke() {},
+        save() {},
+        restore() {},
+        setLineDash(dash) {
+            lineDashes.push({ dash, moveIdx: moves.length, lineIdx: lines.length });
+        }
+    };
+
+    const canvas = {
+        width: 300,
+        height: 220,
+        getContext: () => ctx,
+        getBoundingClientRect: () => ({ left: 0, top: 0 }),
+        addEventListener: (event, fn) => {
+            listeners[event] = fn;
+        },
+        removeEventListener: (event, fn) => {
+            if (listeners[event] === fn) delete listeners[event];
+        }
+    };
+
+    const elements = new Map([['haircut-canvas', canvas]]);
+    const getEl = (id) => {
+        if (!elements.has(id)) {
+            elements.set(id, { id, innerText: '', innerHTML: '', style: {} });
+        }
+        return elements.get(id);
+    };
+
+    const minigamesCtx = loadScript(path.resolve('scripts/minigames.js'), {
+        document: { getElementById: getEl }
+    });
+
+    return { minigamesCtx, moves, lines, lineDashes, strokeStyles, listeners };
+}
+
+describe('Minigame de Corte de Cabelo', () => {
+    test('desenha linha tracejada horizontal em y crescente para curto (65) < medio (115) < longo (170)', () => {
+        const yByStyle = {};
+
+        for (const style of ['curto', 'medio', 'longo']) {
+            const { minigamesCtx, moves, lines, lineDashes } = setupHaircutMinigameContext();
+            minigamesCtx.minigame.openHaircutGame(style, 'castanho', () => {});
+
+            assert.equal(lineDashes.length, 1);
+            assert.deepEqual(Array.from(lineDashes[0].dash), [8, 6]);
+            const start = moves[lineDashes[0].moveIdx];
+            const end = lines[lineDashes[0].lineIdx];
+            assert.equal(start.x, 0);
+            assert.equal(end.x, 300);
+            assert.equal(start.y, end.y);
+            yByStyle[style] = start.y;
+        }
+
+        assert.equal(yByStyle.curto, 65);
+        assert.equal(yByStyle.medio, 115);
+        assert.equal(yByStyle.longo, 170);
+        assert.ok(yByStyle.curto < yByStyle.medio && yByStyle.medio < yByStyle.longo);
+    });
+
+    test('usa strokeStyle correspondente ao hairColor do personagem', () => {
+        const blonde = setupHaircutMinigameContext();
+        blonde.minigamesCtx.minigame.openHaircutGame('medio', 'loiro', () => {});
+        assert.ok(blonde.strokeStyles.includes('#e6c24a'));
+
+        const red = setupHaircutMinigameContext();
+        red.minigamesCtx.minigame.openHaircutGame('medio', 'ruivo', () => {});
+        assert.ok(red.strokeStyles.includes('#c04d26'));
+    });
+
+    test('desenha fios ondulados para cacheado e fios lisos para curto/longo', () => {
+        const curly = setupHaircutMinigameContext();
+        curly.minigamesCtx.minigame.openHaircutGame('cacheado', 'castanho', () => {});
+        const curlyHairLines = curly.lines.filter(l => l.strokeStyle !== '#f1c40f');
+        assert.ok(curlyHairLines.length > 40);
+        assert.ok(new Set(curlyHairLines.map(l => l.x)).size > 40);
+
+        for (const style of ['curto', 'longo']) {
+            const straight = setupHaircutMinigameContext();
+            straight.minigamesCtx.minigame.openHaircutGame(style, 'castanho', () => {});
+            const straightHairLines = straight.lines.filter(l => l.strokeStyle !== '#f1c40f');
+            assert.equal(straightHairLines.length, 40);
+        }
+    });
+
+    test('arraste horizontal ao longo de cutY conclui minigame via finishTask(true) e botão aciona callback (true, false)', () => {
+        const { minigamesCtx, listeners } = setupHaircutMinigameContext();
+        const finishCalls = [];
+        const originalFinishTask = minigamesCtx.minigame.finishTask.bind(minigamesCtx.minigame);
+        minigamesCtx.minigame.finishTask = (success, message) => {
+            finishCalls.push({ success, message });
+            return originalFinishTask(success, message);
+        };
+
+        const callbackCalls = [];
+        minigamesCtx.minigame.openHaircutGame('medio', 'loiro', (success, canceled) => {
+            callbackCalls.push({ success, canceled });
+        });
+
+        const cutY = 115;
+        const noop = () => {};
+        listeners.mousedown({ clientX: 5, clientY: cutY, preventDefault: noop });
+        for (let x = 20; x < 300; x += 15) {
+            if (!listeners.mousemove) break;
+            listeners.mousemove({ clientX: x, clientY: cutY, preventDefault: noop });
+        }
+
+        assert.equal(finishCalls.length, 1);
+        assert.equal(finishCalls[0].success, true);
+        assert.equal(minigamesCtx.minigame.isCompleted, true);
+        assert.equal(callbackCalls.length, 0);
+
+        minigamesCtx.minigame.handleModalButtonClick();
+        assert.deepEqual(callbackCalls, [{ success: true, canceled: false }]);
+    });
+});
+
 
 
